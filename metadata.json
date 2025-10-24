@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Noroeste - Gestor de Viáticos",
+  "description": "Una aplicación inteligente para gestionar reportes de viáticos, extrayendo automáticamente información de comprobantes usando IA. Permite a los empleados registrar gastos y a los contadores revisarlos y filtrarlos de forma eficiente.",
+  "requestFramePermissions": []
+}
