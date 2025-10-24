@@ -94,6 +94,7 @@ const AccountantView: React.FC<AccountantViewProps> = ({ expenses, updateExpense
                             <th scope="col" className="px-6 py-3">Viaje</th>
                             <th scope="col" className="px-6 py-3">Fecha</th>
                             <th scope="col" className="px-6 py-3">Vendedor</th>
+                            <th scope="col" className="px-6 py-3">Categoría</th>
                             <th scope="col" className="px-6 py-3 text-right">Monto</th>
                             <th scope="col" className="px-6 py-3">Comprobante</th>
                             <th scope="col" className="px-6 py-3">Estado</th>
@@ -107,6 +108,7 @@ const AccountantView: React.FC<AccountantViewProps> = ({ expenses, updateExpense
                                 <td className="px-6 py-4">{expense.tripName}</td>
                                 <td className="px-6 py-4">{expense.date}</td>
                                 <td className="px-6 py-4">{expense.vendor}</td>
+                                <td className="px-6 py-4">{expense.category}</td>
                                 <td className="px-6 py-4 text-right">{new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(expense.amount)} {expense.currency}</td>
                                 <td className="px-6 py-4">
                                     <button onClick={() => setSelectedExpense(expense)} className="font-medium text-noroeste-red hover:underline">Ver</button>
@@ -127,7 +129,7 @@ const AccountantView: React.FC<AccountantViewProps> = ({ expenses, updateExpense
                     </tbody>
                      <tfoot>
                         <tr className="font-semibold text-gray-900 bg-gray-100">
-                            <td colSpan={4} className="px-6 py-3 text-base text-right">Total</td>
+                            <td colSpan={5} className="px-6 py-3 text-base text-right">Total</td>
                             <td className="px-6 py-3 text-right">{new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(totalAmount)}</td>
                             <td colSpan={3}></td>
                         </tr>
