@@ -45,12 +45,15 @@ const AccountantView: React.FC<AccountantViewProps> = ({ expenses, updateExpense
     const [filterStatus, setFilterStatus] = useState<Expense['status'] | ''>('Pendiente');
     const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
 
-    const employeeOptions = useMemo(() => [...new Set(expenses.map(e => e.employeeName))], [expenses]);
+    const employeeOptions = useMemo(() => {
+        const allNames = expenses.flatMap(e => e.employeeName.split(',').map(name => name.trim()));
+        return [...new Set(allNames)].sort();
+    }, [expenses]);
     const tripOptions = useMemo(() => [...new Set(expenses.map(e => e.tripName))], [expenses]);
 
     const filteredExpenses = useMemo(() => {
         return expenses.filter(expense => {
-            if (filterEmployee && expense.employeeName !== filterEmployee) return false;
+            if (filterEmployee && !expense.employeeName.split(',').map(n => n.trim()).includes(filterEmployee)) return false;
             if (filterTrip && expense.tripName !== filterTrip) return false;
             if (filterStartDate && expense.date < filterStartDate) return false;
             if (filterEndDate && expense.date > filterEndDate) return false;

@@ -23,13 +23,30 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
-    const [employeeName, setEmployeeName] = useState('');
+    const [employeeNames, setEmployeeNames] = useState<string[]>(['']);
     const [tripName, setTripName] = useState('');
     const [extractedInfos, setExtractedInfos] = useState<ExtractedInfo[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleEmployeeNameChange = (index: number, value: string) => {
+        const newNames = [...employeeNames];
+        newNames[index] = value;
+        setEmployeeNames(newNames);
+    };
+
+    const handleAddEmployee = () => {
+        setEmployeeNames([...employeeNames, '']);
+    };
+
+    const handleRemoveEmployee = (index: number) => {
+        if (employeeNames.length > 1) {
+            setEmployeeNames(employeeNames.filter((_, i) => i !== index));
+        }
+    };
+
 
     const handleExtraction = useCallback(async () => {
         const files = fileInputRef.current?.files;
@@ -80,18 +97,26 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!employeeName || !tripName || extractedInfos.length === 0) {
-            setError('Por favor, completa tu nombre, el del viaje y extrae la información de al menos un comprobante.');
+        const filledEmployeeNames = employeeNames.filter(name => name.trim() !== '');
+
+        if (filledEmployeeNames.length === 0 || !tripName || extractedInfos.length === 0) {
+            setError('Por favor, completa al menos un nombre de empleado, el nombre del viaje y extrae la información de al menos un comprobante.');
+            return;
+        }
+        if (filledEmployeeNames.length !== employeeNames.length) {
+            setError('Por favor, completa los nombres de todos los empleados o elimina los campos vacíos.');
             return;
         }
 
         setIsSubmitting(true);
+        
+        const combinedEmployeeName = filledEmployeeNames.join(', ');
 
         const newExpenses: Expense[] = await Promise.all(extractedInfos.map(async (info) => {
             const fileContent = await fileToBase64(info.file);
             return {
                 id: info.id,
-                employeeName,
+                employeeName: combinedEmployeeName,
                 tripName,
                 vendor: info.data.vendor,
                 date: info.data.date,
@@ -134,8 +159,33 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label htmlFor="employeeName" className="block text-sm font-medium text-gray-700">Nombre del Empleado</label>
-                        <input type="text" id="employeeName" value={employeeName} onChange={e => setEmployeeName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-noroeste-red focus:border-noroeste-red" required />
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Empleado(s)</label>
+                        {employeeNames.map((name, index) => (
+                            <div key={index} className="flex items-center space-x-2 mb-2">
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={e => handleEmployeeNameChange(index, e.target.value)}
+                                    className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-noroeste-red focus:border-noroeste-red"
+                                    placeholder={`Nombre del Empleado ${index + 1}`}
+                                    required
+                                />
+                                {index === employeeNames.length - 1 && (
+                                    <button type="button" onClick={handleAddEmployee} className="p-1.5 text-gray-500 bg-gray-100 rounded-full hover:bg-green-100 hover:text-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                )}
+                                {employeeNames.length > 1 && (
+                                    <button type="button" onClick={() => handleRemoveEmployee(index)} className="p-1.5 text-gray-500 bg-gray-100 rounded-full hover:bg-red-100 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
+                        ))}
                     </div>
                     <div>
                         <label htmlFor="tripName" className="block text-sm font-medium text-gray-700">Nombre del Viaje/Proyecto</label>
