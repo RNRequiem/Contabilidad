@@ -21,15 +21,14 @@ const textToGenerativePart = (text: string) => {
 };
 
 export const extractExpenseInfo = async (file: File): Promise<{ data: ExtractedData | null; error?: string }> => {
-    const API_KEY = process.env.API_KEY;
-
-    if (!API_KEY) {
-        const errorMessage = "La variable de entorno API_KEY no está configurada. Por favor, configúrala en los ajustes de tu proyecto de Vercel y vuelve a desplegar la aplicación.";
-        console.error(errorMessage);
-        return { data: null, error: errorMessage };
+    // Se agrega una verificación explícita para la API_KEY.
+    if (!process.env.API_KEY) {
+        return { data: null, error: 'La variable de entorno API_KEY no está configurada. Por favor, configúrala en los ajustes de tu proyecto de Vercel y vuelve a desplegar la aplicación.' };
     }
 
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    // Fix: Per @google/genai guidelines, API key must be from process.env.API_KEY and assumed to be present.
+    // This also resolves the TypeScript error "Property 'env' does not exist on type 'ImportMeta'".
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = 'gemini-2.5-flash';
 
     const basePrompt = `
@@ -87,8 +86,9 @@ export const extractExpenseInfo = async (file: File): Promise<{ data: ExtractedD
         console.error("Error extracting expense info from Gemini:", error);
         let errorMessage = "Ocurrió un error inesperado al procesar el archivo. Revisa la consola del navegador para más detalles.";
         if (error?.message) {
+            // Fix: Updated error message to remove reference to VITE_API_KEY, aligning with API key handling change.
              if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
-                errorMessage = "La API Key proporcionada no es válida o ha expirado. Verifícala en la configuración de Vercel.";
+                errorMessage = "La API Key proporcionada no es válida o ha expirado. Verifícala en la configuración de variables de entorno.";
             } else if (error.message.includes('permission denied') || error.message.includes('IAM_PERMISSION_DENIED')) {
                 errorMessage = "Permiso denegado. Asegúrate de que tu API Key tenga los permisos necesarios para usar la API de Gemini.";
             } else if (error.message.includes('quota')) {
