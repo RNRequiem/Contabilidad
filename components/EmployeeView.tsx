@@ -101,13 +101,14 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
 
         const fileArray = Array.from(files);
         const results = await Promise.allSettled(
-            fileArray.map((file: File) => extractExpenseInfo(file).then(data => ({ file, data })))
+            fileArray.map((file: File) => extractExpenseInfo(file).then(result => ({ file, ...result })))
         );
 
         const successfulExtractions: ExtractedInfo[] = [];
-        const extractionErrors: string[] = [];
+        const extractionErrors: { fileName: string, reason: string }[] = [];
         
         results.forEach((result, index) => {
+            const fileName = fileArray[index]?.name || 'un archivo';
             if (result.status === 'fulfilled' && result.value.data) {
                 successfulExtractions.push({
                     id: `${result.value.file.name}-${Math.random()}`,
@@ -115,16 +116,28 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
                     data: result.value.data,
                 });
             } else {
-                 const fileName = fileArray[index]?.name || 'un archivo';
-                 extractionErrors.push(fileName);
-                 console.error(`Extraction failed for ${fileName}:`, result.status === 'rejected' ? result.reason : 'No data extracted');
+                 let reason = 'No se pudieron extraer datos.';
+                 if (result.status === 'fulfilled' && result.value.error) {
+                     reason = result.value.error;
+                 } else if (result.status === 'rejected') {
+                     reason = 'Ocurrió un error inesperado en el cliente.';
+                     console.error(`Extraction failed for ${fileName}:`, result.reason);
+                 }
+                 extractionErrors.push({ fileName, reason });
             }
         });
 
         setExtractedInfos(successfulExtractions);
 
         if (extractionErrors.length > 0) {
-            setError(`No se pudo extraer información de ${extractionErrors.length} archivo(s). Revisa los que se muestran a continuación.`);
+            const singleError = extractionErrors.length === 1 && extractionErrors[0].reason;
+            // Si el error es sobre la API Key, mostrarlo de forma prominente.
+            if (singleError && (singleError.includes('API_KEY') || singleError.includes('API Key'))) {
+                setError(singleError);
+            } else {
+                 const errorSummary = `No se pudo extraer información de ${extractionErrors.length} archivo(s). Revisa los que se muestran a continuación.`;
+                 setError(errorSummary);
+            }
         }
 
         setIsLoading(false);
@@ -192,7 +205,7 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
     return (
         <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-4xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Registrar Nuevos Gastos</h2>
-            {error && <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert"><p>{error}</p></div>}
+            {error && <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 whitespace-pre-wrap" role="alert"><p>{error}</p></div>}
             
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

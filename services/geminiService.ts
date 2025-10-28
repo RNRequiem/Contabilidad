@@ -1,9 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ExtractedData } from '../types';
 
-// Se inicializará el cliente de IA de forma diferida (lazy) para evitar que la aplicación se bloquee al cargar
-// si la variable de entorno API_KEY no está presente.
-
 const fileToGenerativePart = async (file: File) => {
     const base64EncodedData = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -23,14 +20,13 @@ const textToGenerativePart = (text: string) => {
     return { text };
 };
 
-export const extractExpenseInfo = async (file: File): Promise<ExtractedData | null> => {
+export const extractExpenseInfo = async (file: File): Promise<{ data: ExtractedData | null; error?: string }> => {
     const API_KEY = process.env.API_KEY;
 
     if (!API_KEY) {
-        // Ahora esto registrará un error en la consola en lugar de bloquear la aplicación.
-        // La interfaz de usuario mostrará un error de extracción.
-        console.error("API_KEY environment variable not set. Please configure it in your Vercel project settings.");
-        return null;
+        const errorMessage = "La variable de entorno API_KEY no está configurada. Por favor, configúrala en los ajustes de tu proyecto de Vercel y vuelve a desplegar la aplicación.";
+        console.error(errorMessage);
+        return { data: null, error: errorMessage };
     }
 
     const ai = new GoogleGenAI({ apiKey: API_KEY });
@@ -38,39 +34,31 @@ export const extractExpenseInfo = async (file: File): Promise<ExtractedData | nu
 
     const basePrompt = `
     Analiza la imagen o el texto del comprobante y extrae la siguiente información en formato JSON.
-    - El nombre del vendedor o tienda.
-    - La fecha de la transacción en formato AAAA-MM-DD.
-    - El monto total de la transacción como un número.
-    - El símbolo o código de la moneda (ej. $, MXN, USD).
-    - Una categoría sugerida para el gasto (ej. Comida, Transporte, Alojamiento, Otro).
+    - El nombre del vendedor o tienda (vendor).
+    - La fecha de la transacción en formato AAAA-MM-DD (date).
+    - El monto total de la transacción como un número (totalAmount).
+    - El símbolo o código de la moneda (ej. $, MXN, USD) (currency).
+    - Una categoría sugerida para el gasto (ej. Comida, Transporte, Alojamiento, Otro) (category).
 
     Si alguna información no está disponible, déjala como un string vacío o 0 para el monto.
     Asegúrate de que el resultado sea únicamente el objeto JSON.
     `;
 
-    const preparePromptParts = async () => {
-        if (file.type.startsWith('image/')) {
-            const imagePart = await fileToGenerativePart(file);
-            return [imagePart, textToGenerativePart(basePrompt)];
-        }
-        if (file.type === 'application/pdf') {
-            const pdfPart = await fileToGenerativePart(file);
-            const pdfPrompt = `Este archivo es un PDF, trátalo como una imagen. ${basePrompt}`;
-            return [pdfPart, textToGenerativePart(pdfPrompt)];
-        }
-        if (['application/xml', 'text/xml'].includes(file.type)) {
+    try {
+        let parts: any[];
+
+        if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+            const filePart = await fileToGenerativePart(file);
+            const prompt = file.type === 'application/pdf' ? `Este archivo es un PDF, trátalo como una imagen. ${basePrompt}` : basePrompt;
+            parts = [filePart, textToGenerativePart(prompt)];
+        } else if (['application/xml', 'text/xml'].includes(file.type)) {
             const textContent = await file.text();
             const xmlPrompt = `Analiza el siguiente contenido XML de una factura y extrae la información requerida.\n\n${textContent}\n\n${basePrompt}`;
-            return [textToGenerativePart(xmlPrompt)];
-        }
-        console.error("Unsupported file type:", file.type);
-        return null;
-    };
-
-    try {
-        const parts = await preparePromptParts();
-        if (!parts) {
-            return null;
+            parts = [textToGenerativePart(xmlPrompt)];
+        } else {
+            const errorMessage = `Tipo de archivo no soportado: ${file.type}`;
+            console.error(errorMessage);
+            return { data: null, error: errorMessage };
         }
 
         const response = await ai.models.generateContent({
@@ -93,10 +81,20 @@ export const extractExpenseInfo = async (file: File): Promise<ExtractedData | nu
         });
 
         const jsonString = response.text.trim();
-        return JSON.parse(jsonString) as ExtractedData;
+        return { data: JSON.parse(jsonString) as ExtractedData };
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error extracting expense info from Gemini:", error);
-        return null;
+        let errorMessage = "Ocurrió un error inesperado al procesar el archivo. Revisa la consola del navegador para más detalles.";
+        if (error?.message) {
+             if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
+                errorMessage = "La API Key proporcionada no es válida o ha expirado. Verifícala en la configuración de Vercel.";
+            } else if (error.message.includes('permission denied') || error.message.includes('IAM_PERMISSION_DENIED')) {
+                errorMessage = "Permiso denegado. Asegúrate de que tu API Key tenga los permisos necesarios para usar la API de Gemini.";
+            } else if (error.message.includes('quota')) {
+                 errorMessage = "Se ha excedido la cuota de la API. Por favor, intenta de nuevo más tarde o revisa tu plan de facturación.";
+            }
+        }
+        return { data: null, error: errorMessage };
     }
 };
