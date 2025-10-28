@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { ExtractedData } from '../types';
 
@@ -26,16 +25,13 @@ const fileToGenerativePart = async (file: File) => {
 };
 
 const textToGenerativePart = (text: string) => {
-    return {
-        text: text
-    };
+    return { text };
 };
-
 
 export const extractExpenseInfo = async (file: File): Promise<ExtractedData | null> => {
     const model = 'gemini-2.5-flash';
 
-    const prompt = `
+    const basePrompt = `
     Analiza la imagen o el texto del comprobante y extrae la siguiente información en formato JSON.
     - El nombre del vendedor o tienda.
     - La fecha de la transacción en formato AAAA-MM-DD.
@@ -47,22 +43,28 @@ export const extractExpenseInfo = async (file: File): Promise<ExtractedData | nu
     Asegúrate de que el resultado sea únicamente el objeto JSON.
     `;
 
-    try {
-        let parts;
+    const preparePromptParts = async () => {
         if (file.type.startsWith('image/')) {
             const imagePart = await fileToGenerativePart(file);
-            parts = [imagePart, textToGenerativePart(prompt)];
-        } else if (file.type === 'application/xml' || file.type === 'text/xml') {
+            return [imagePart, textToGenerativePart(basePrompt)];
+        }
+        if (file.type === 'application/pdf') {
+            const pdfPart = await fileToGenerativePart(file);
+            const pdfPrompt = `Este archivo es un PDF, trátalo como una imagen. ${basePrompt}`;
+            return [pdfPart, textToGenerativePart(pdfPrompt)];
+        }
+        if (['application/xml', 'text/xml'].includes(file.type)) {
             const textContent = await file.text();
-            const xmlPrompt = `Analiza el siguiente contenido XML de una factura y extrae la información requerida.\n\n${textContent}\n\n${prompt}`;
-            parts = [textToGenerativePart(xmlPrompt)];
-        } else if (file.type === 'application/pdf') {
-             // For simplicity, we handle PDFs as images. For real-world apps, a more robust PDF parsing would be needed.
-            const imagePart = await fileToGenerativePart(file);
-            const pdfPrompt = `Este archivo es un PDF, trátalo como una imagen. ${prompt}`;
-            parts = [imagePart, textToGenerativePart(pdfPrompt)];
-        } else {
-            console.error("Unsupported file type:", file.type);
+            const xmlPrompt = `Analiza el siguiente contenido XML de una factura y extrae la información requerida.\n\n${textContent}\n\n${basePrompt}`;
+            return [textToGenerativePart(xmlPrompt)];
+        }
+        console.error("Unsupported file type:", file.type);
+        return null;
+    };
+
+    try {
+        const parts = await preparePromptParts();
+        if (!parts) {
             return null;
         }
 

@@ -13,6 +13,12 @@ interface ExtractedInfo {
     data: ExtractedData;
 }
 
+interface ExtractedExpenseCardProps {
+    info: ExtractedInfo;
+    index: number;
+    handleFieldChange: (id: string, field: keyof ExtractedData, value: any) => void;
+}
+
 const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -22,9 +28,40 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
+const ExtractedExpenseCard: React.FC<ExtractedExpenseCardProps> = ({ info, index, handleFieldChange }) => (
+    <div key={info.id} className="bg-gray-50 p-6 rounded-lg border border-gray-200 space-y-4 animate-fade-in">
+        <h3 className="text-lg font-semibold text-gray-900">Comprobante {index + 1}: <span className="text-base font-normal text-gray-600">{info.file.name}</span></h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label htmlFor={`vendor-${info.id}`} className="block text-sm font-medium text-gray-700">Vendedor</label>
+                <input type="text" id={`vendor-${info.id}`} value={info.data.vendor} onChange={e => handleFieldChange(info.id, 'vendor', e.target.value)} className="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md" />
+            </div>
+            <div>
+                <label htmlFor={`date-${info.id}`} className="block text-sm font-medium text-gray-700">Fecha</label>
+                <input type="date" id={`date-${info.id}`} value={info.data.date} onChange={e => handleFieldChange(info.id, 'date', e.target.value)} className="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md" />
+            </div>
+            <div className="flex items-end gap-2">
+                <div className="flex-grow">
+                    <label htmlFor={`amount-${info.id}`} className="block text-sm font-medium text-gray-700">Monto</label>
+                    <input type="number" step="0.01" id={`amount-${info.id}`} value={info.data.totalAmount} onChange={e => handleFieldChange(info.id, 'totalAmount', parseFloat(e.target.value))} className="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md" />
+                </div>
+                <div>
+                    <label htmlFor={`currency-${info.id}`} className="block text-sm font-medium text-gray-700">Moneda</label>
+                    <input type="text" id={`currency-${info.id}`} value={info.data.currency} onChange={e => handleFieldChange(info.id, 'currency', e.target.value)} className="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md" />
+                </div>
+            </div>
+            <div>
+                <label htmlFor={`category-${info.id}`} className="block text-sm font-medium text-gray-700">Categoría</label>
+                <input type="text" id={`category-${info.id}`} value={info.data.category} onChange={e => handleFieldChange(info.id, 'category', e.target.value)} className="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md" />
+            </div>
+        </div>
+    </div>
+);
+
+
 const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
     const [employeeNames, setEmployeeNames] = useState<string[]>(['']);
-    const [tripName, setTripName] = useState('');
+    const [tripDetails, setTripDetails] = useState({ name: '', startDate: '', endDate: '' });
     const [extractedInfos, setExtractedInfos] = useState<ExtractedInfo[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -46,6 +83,10 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
             setEmployeeNames(employeeNames.filter((_, i) => i !== index));
         }
     };
+    
+    const handleTripDetailsChange = (field: keyof typeof tripDetails, value: string) => {
+        setTripDetails(prev => ({ ...prev, [field]: value }));
+    };
 
 
     const handleExtraction = useCallback(async () => {
@@ -59,37 +100,31 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
         setExtractedInfos([]);
 
         const fileArray = Array.from(files);
-        // FIX: Explicitly type `file` as `File` to resolve TypeScript inference issues.
         const results = await Promise.allSettled(
             fileArray.map((file: File) => extractExpenseInfo(file).then(data => ({ file, data })))
         );
 
         const successfulExtractions: ExtractedInfo[] = [];
-        let extractionErrors = 0;
-
-        // FIX: Restructure result handling to correctly differentiate between rejected promises and fulfilled promises with null data.
-        results.forEach(result => {
-            if (result.status === 'fulfilled') {
-                if (result.value.data) {
-                    successfulExtractions.push({
-                        id: `${result.value.file.name}-${Math.random()}`,
-                        file: result.value.file,
-                        data: result.value.data,
-                    });
-                } else {
-                    extractionErrors++;
-                    console.error("Extraction returned null for file:", result.value.file.name);
-                }
-            } else { // status is 'rejected'
-                extractionErrors++;
-                console.error("Extraction failed for a file:", result.reason);
+        const extractionErrors: string[] = [];
+        
+        results.forEach((result, index) => {
+            if (result.status === 'fulfilled' && result.value.data) {
+                successfulExtractions.push({
+                    id: `${result.value.file.name}-${Math.random()}`,
+                    file: result.value.file,
+                    data: result.value.data,
+                });
+            } else {
+                 const fileName = fileArray[index]?.name || 'un archivo';
+                 extractionErrors.push(fileName);
+                 console.error(`Extraction failed for ${fileName}:`, result.status === 'rejected' ? result.reason : 'No data extracted');
             }
         });
 
         setExtractedInfos(successfulExtractions);
 
-        if (extractionErrors > 0) {
-            setError(`No se pudo extraer información de ${extractionErrors} archivo(s). Revisa los que se muestran a continuación.`);
+        if (extractionErrors.length > 0) {
+            setError(`No se pudo extraer información de ${extractionErrors.length} archivo(s). Revisa los que se muestran a continuación.`);
         }
 
         setIsLoading(false);
@@ -99,8 +134,8 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
         e.preventDefault();
         const filledEmployeeNames = employeeNames.filter(name => name.trim() !== '');
 
-        if (filledEmployeeNames.length === 0 || !tripName || extractedInfos.length === 0) {
-            setError('Por favor, completa al menos un nombre de empleado, el nombre del viaje y extrae la información de al menos un comprobante.');
+        if (filledEmployeeNames.length === 0 || !tripDetails.name || !tripDetails.startDate || !tripDetails.endDate || extractedInfos.length === 0) {
+            setError('Por favor, completa al menos un nombre de empleado, el nombre del viaje, las fechas del viaje y extrae la información de al menos un comprobante.');
             return;
         }
         if (filledEmployeeNames.length !== employeeNames.length) {
@@ -117,7 +152,9 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
             return {
                 id: info.id,
                 employeeName: combinedEmployeeName,
-                tripName,
+                tripName: tripDetails.name,
+                tripStartDate: tripDetails.startDate,
+                tripEndDate: tripDetails.endDate,
                 vendor: info.data.vendor,
                 date: info.data.date,
                 amount: info.data.totalAmount,
@@ -134,10 +171,11 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
         
         addExpenses(newExpenses);
         
-        // Reset form but keep names
+        // Reset form
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
+        setTripDetails({ name: '', startDate: '', endDate: '' });
         setExtractedInfos([]);
         setError(null);
         setIsSubmitting(false);
@@ -188,8 +226,22 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
                         ))}
                     </div>
                     <div>
-                        <label htmlFor="tripName" className="block text-sm font-medium text-gray-700">Nombre del Viaje/Proyecto</label>
-                        <input type="text" id="tripName" value={tripName} onChange={e => setTripName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-noroeste-red focus:border-noroeste-red" required />
+                        <div className="grid grid-cols-1 gap-6">
+                            <div>
+                                <label htmlFor="tripName" className="block text-sm font-medium text-gray-700">Nombre del Viaje/Proyecto</label>
+                                <input type="text" id="tripName" value={tripDetails.name} onChange={e => handleTripDetailsChange('name', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-noroeste-red focus:border-noroeste-red" required />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="tripStartDate" className="block text-sm font-medium text-gray-700">Inicio de Viaje</label>
+                                    <input type="date" id="tripStartDate" value={tripDetails.startDate} onChange={e => handleTripDetailsChange('startDate', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-noroeste-red focus:border-noroeste-red" required />
+                                </div>
+                                <div>
+                                    <label htmlFor="tripEndDate" className="block text-sm font-medium text-gray-700">Fin de Viaje</label>
+                                    <input type="date" id="tripEndDate" value={tripDetails.endDate} onChange={e => handleTripDetailsChange('endDate', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-noroeste-red focus:border-noroeste-red" required />
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -207,33 +259,12 @@ const EmployeeView: React.FC<EmployeeViewProps> = ({ addExpenses }) => {
                 {extractedInfos.length > 0 && (
                      <div className="space-y-6">
                         {extractedInfos.map((info, index) => (
-                            <div key={info.id} className="bg-gray-50 p-6 rounded-lg border border-gray-200 space-y-4 animate-fade-in">
-                                <h3 className="text-lg font-semibold text-gray-900">Comprobante {index + 1}: <span className="text-base font-normal text-gray-600">{info.file.name}</span></h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label htmlFor={`vendor-${info.id}`} className="block text-sm font-medium text-gray-700">Vendedor</label>
-                                        <input type="text" id={`vendor-${info.id}`} value={info.data.vendor} onChange={e => handleFieldChange(info.id, 'vendor', e.target.value)} className="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md" />
-                                    </div>
-                                    <div>
-                                        <label htmlFor={`date-${info.id}`} className="block text-sm font-medium text-gray-700">Fecha</label>
-                                        <input type="date" id={`date-${info.id}`} value={info.data.date} onChange={e => handleFieldChange(info.id, 'date', e.target.value)} className="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md" />
-                                    </div>
-                                    <div className="flex items-end gap-2">
-                                        <div className="flex-grow">
-                                            <label htmlFor={`amount-${info.id}`} className="block text-sm font-medium text-gray-700">Monto</label>
-                                            <input type="number" step="0.01" id={`amount-${info.id}`} value={info.data.totalAmount} onChange={e => handleFieldChange(info.id, 'totalAmount', parseFloat(e.target.value))} className="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md" />
-                                        </div>
-                                        <div>
-                                            <label htmlFor={`currency-${info.id}`} className="block text-sm font-medium text-gray-700">Moneda</label>
-                                            <input type="text" id={`currency-${info.id}`} value={info.data.currency} onChange={e => handleFieldChange(info.id, 'currency', e.target.value)} className="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label htmlFor={`category-${info.id}`} className="block text-sm font-medium text-gray-700">Categoría</label>
-                                        <input type="text" id={`category-${info.id}`} value={info.data.category} onChange={e => handleFieldChange(info.id, 'category', e.target.value)} className="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md" />
-                                    </div>
-                                </div>
-                            </div>
+                            <ExtractedExpenseCard 
+                                key={info.id}
+                                info={info}
+                                index={index}
+                                handleFieldChange={handleFieldChange}
+                            />
                         ))}
                     </div>
                 )}

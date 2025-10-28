@@ -37,6 +37,83 @@ const StatusBadge: React.FC<{ status: Expense['status'] }> = ({ status }) => {
     return <span className={`${baseClasses} ${statusClasses[status]}`}>{status}</span>;
 };
 
+const ExpenseFilters: React.FC<any> = ({ filters, setFilters, employeeOptions, tripOptions }) => (
+    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
+        <select value={filters.employee} onChange={e => setFilters.employee(e.target.value)} className="w-full px-3 py-2 border-gray-300 rounded-md">
+            <option value="">Todos los Empleados</option>
+            {employeeOptions.map((name: string) => <option key={name} value={name}>{name}</option>)}
+        </select>
+        <select value={filters.trip} onChange={e => setFilters.trip(e.target.value)} className="w-full px-3 py-2 border-gray-300 rounded-md">
+            <option value="">Todos los Viajes</option>
+            {tripOptions.map((name: string) => <option key={name} value={name}>{name}</option>)}
+        </select>
+        <select value={filters.status} onChange={e => setFilters.status(e.target.value as any)} className="w-full px-3 py-2 border-gray-300 rounded-md">
+            <option value="">Todos los Estados</option>
+            <option value="Pendiente">Pendiente</option>
+            <option value="Aprobado">Aprobado</option>
+            <option value="Rechazado">Rechazado</option>
+        </select>
+        <input type="date" value={filters.startDate} onChange={e => setFilters.startDate(e.target.value)} className="w-full px-3 py-2 border-gray-300 rounded-md" placeholder="Fecha inicio"/>
+        <input type="date" value={filters.endDate} onChange={e => setFilters.endDate(e.target.value)} className="w-full px-3 py-2 border-gray-300 rounded-md" placeholder="Fecha fin"/>
+    </div>
+);
+
+const ExpensesTable: React.FC<any> = ({ expenses, totalAmount, onUpdateStatus, onSelectExpense }) => (
+    <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left text-gray-500">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-100">
+                <tr>
+                    <th scope="col" className="px-6 py-3">Empleado</th>
+                    <th scope="col" className="px-6 py-3">Viaje</th>
+                    <th scope="col" className="px-6 py-3">Fecha</th>
+                    <th scope="col" className="px-6 py-3">Vendedor</th>
+                    <th scope="col" className="px-6 py-3">Categoría</th>
+                    <th scope="col" className="px-6 py-3 text-right">Monto</th>
+                    <th scope="col" className="px-6 py-3">Comprobante</th>
+                    <th scope="col" className="px-6 py-3">Estado</th>
+                    <th scope="col" className="px-6 py-3">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {expenses.map((expense: Expense) => (
+                    <tr key={expense.id} className="bg-white border-b hover:bg-gray-50">
+                        <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{expense.employeeName}</td>
+                        <td className="px-6 py-4">
+                            <div>{expense.tripName}</div>
+                            <div className="text-xs text-gray-500">{expense.tripStartDate} al {expense.tripEndDate}</div>
+                        </td>
+                        <td className="px-6 py-4">{expense.date}</td>
+                        <td className="px-6 py-4">{expense.vendor}</td>
+                        <td className="px-6 py-4">{expense.category}</td>
+                        <td className="px-6 py-4 text-right">{new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(expense.amount)} {expense.currency}</td>
+                        <td className="px-6 py-4">
+                            <button onClick={() => onSelectExpense(expense)} className="font-medium text-noroeste-red hover:underline">Ver</button>
+                        </td>
+                        <td className="px-6 py-4"><StatusBadge status={expense.status} /></td>
+                        <td className="px-6 py-4 space-x-2">
+                            {expense.status === 'Pendiente' && (
+                                <>
+                                    <button onClick={() => onUpdateStatus(expense.id, 'Aprobado')} className="font-medium text-green-600 hover:underline">Aprobar</button>
+                                    <button onClick={() => onUpdateStatus(expense.id, 'Rechazado')} className="font-medium text-red-600 hover:underline">Rechazar</button>
+                                </>
+                            )}
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+            <tfoot>
+                <tr className="font-semibold text-gray-900 bg-gray-100">
+                    <td colSpan={5} className="px-6 py-3 text-base text-right">Total</td>
+                    <td className="px-6 py-3 text-right">{new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(totalAmount)}</td>
+                    <td colSpan={3}></td>
+                </tr>
+            </tfoot>
+        </table>
+        {expenses.length === 0 && <p className="text-center py-8 text-gray-500">No se encontraron gastos con los filtros aplicados.</p>}
+    </div>
+);
+
+
 const AccountantView: React.FC<AccountantViewProps> = ({ expenses, updateExpenseStatus }) => {
     const [filterEmployee, setFilterEmployee] = useState('');
     const [filterTrip, setFilterTrip] = useState('');
@@ -70,76 +147,32 @@ const AccountantView: React.FC<AccountantViewProps> = ({ expenses, updateExpense
         <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-7xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Revisión de Gastos</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
-                <select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="w-full px-3 py-2 border-gray-300 rounded-md">
-                    <option value="">Todos los Empleados</option>
-                    {employeeOptions.map(name => <option key={name} value={name}>{name}</option>)}
-                </select>
-                <select value={filterTrip} onChange={e => setFilterTrip(e.target.value)} className="w-full px-3 py-2 border-gray-300 rounded-md">
-                    <option value="">Todos los Viajes</option>
-                    {tripOptions.map(name => <option key={name} value={name}>{name}</option>)}
-                </select>
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)} className="w-full px-3 py-2 border-gray-300 rounded-md">
-                    <option value="">Todos los Estados</option>
-                    <option value="Pendiente">Pendiente</option>
-                    <option value="Aprobado">Aprobado</option>
-                    <option value="Rechazado">Rechazado</option>
-                </select>
-                <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="w-full px-3 py-2 border-gray-300 rounded-md" placeholder="Fecha inicio"/>
-                <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} className="w-full px-3 py-2 border-gray-300 rounded-md" placeholder="Fecha fin"/>
-            </div>
+            <ExpenseFilters
+                filters={{
+                    employee: filterEmployee,
+                    trip: filterTrip,
+                    status: filterStatus,
+                    startDate: filterStartDate,
+                    endDate: filterEndDate
+                }}
+                setFilters={{
+                    employee: setFilterEmployee,
+                    trip: setFilterTrip,
+                    status: setFilterStatus,
+                    startDate: setFilterStartDate,
+                    endDate: setFilterEndDate
+                }}
+                employeeOptions={employeeOptions}
+                tripOptions={tripOptions}
+            />
+            
+            <ExpensesTable 
+                expenses={filteredExpenses}
+                totalAmount={totalAmount}
+                onUpdateStatus={updateExpenseStatus}
+                onSelectExpense={setSelectedExpense}
+            />
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-gray-500">
-                    <thead className="text-xs text-gray-700 uppercase bg-gray-100">
-                        <tr>
-                            <th scope="col" className="px-6 py-3">Empleado</th>
-                            <th scope="col" className="px-6 py-3">Viaje</th>
-                            <th scope="col" className="px-6 py-3">Fecha</th>
-                            <th scope="col" className="px-6 py-3">Vendedor</th>
-                            <th scope="col" className="px-6 py-3">Categoría</th>
-                            <th scope="col" className="px-6 py-3 text-right">Monto</th>
-                            <th scope="col" className="px-6 py-3">Comprobante</th>
-                            <th scope="col" className="px-6 py-3">Estado</th>
-                             <th scope="col" className="px-6 py-3">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredExpenses.map(expense => (
-                            <tr key={expense.id} className="bg-white border-b hover:bg-gray-50">
-                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{expense.employeeName}</td>
-                                <td className="px-6 py-4">{expense.tripName}</td>
-                                <td className="px-6 py-4">{expense.date}</td>
-                                <td className="px-6 py-4">{expense.vendor}</td>
-                                <td className="px-6 py-4">{expense.category}</td>
-                                <td className="px-6 py-4 text-right">{new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(expense.amount)} {expense.currency}</td>
-                                <td className="px-6 py-4">
-                                    <button onClick={() => setSelectedExpense(expense)} className="font-medium text-noroeste-red hover:underline">Ver</button>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <StatusBadge status={expense.status} />
-                                </td>
-                                <td className="px-6 py-4 space-x-2">
-                                    {expense.status === 'Pendiente' && (
-                                        <>
-                                            <button onClick={() => updateExpenseStatus(expense.id, 'Aprobado')} className="font-medium text-green-600 hover:underline">Aprobar</button>
-                                            <button onClick={() => updateExpenseStatus(expense.id, 'Rechazado')} className="font-medium text-red-600 hover:underline">Rechazar</button>
-                                        </>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                     <tfoot>
-                        <tr className="font-semibold text-gray-900 bg-gray-100">
-                            <td colSpan={5} className="px-6 py-3 text-base text-right">Total</td>
-                            <td className="px-6 py-3 text-right">{new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(totalAmount)}</td>
-                            <td colSpan={3}></td>
-                        </tr>
-                    </tfoot>
-                </table>
-                 {filteredExpenses.length === 0 && <p className="text-center py-8 text-gray-500">No se encontraron gastos con los filtros aplicados.</p>}
-            </div>
             {selectedExpense && <ReceiptModal expense={selectedExpense} onClose={() => setSelectedExpense(null)} />}
         </div>
     );

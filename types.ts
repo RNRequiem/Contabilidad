@@ -8,6 +8,8 @@ export interface Expense {
     id: string;
     employeeName: string;
     tripName: string;
+    tripStartDate: string;
+    tripEndDate: string;
     vendor: string;
     date: string;
     amount: number;

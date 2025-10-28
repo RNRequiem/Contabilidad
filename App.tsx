@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Role, Expense } from './types';
 import EmployeeView from './components/EmployeeView';
 import AccountantView from './components/AccountantView';
@@ -37,18 +37,18 @@ const App: React.FC = () => {
     const [role, setRole] = useState<Role>(Role.Employee);
     const [expenses, setExpenses] = useState<Expense[]>(mockExpenses);
 
-    const addExpenses = (newExpenses: Expense[]) => {
+    const addExpenses = useCallback((newExpenses: Expense[]) => {
         setExpenses(prevExpenses => [...newExpenses, ...prevExpenses]);
         alert(`${newExpenses.length} gasto(s) agregado(s) exitosamente!`);
-    };
+    }, []);
 
-    const updateExpenseStatus = (expenseId: string, status: 'Aprobado' | 'Rechazado') => {
+    const updateExpenseStatus = useCallback((expenseId: string, status: 'Aprobado' | 'Rechazado') => {
         setExpenses(prevExpenses =>
             prevExpenses.map(expense =>
                 expense.id === expenseId ? { ...expense, status } : expense
             )
         );
-    };
+    }, []);
 
     return (
         <div className="min-h-screen bg-gray-100 font-sans">
