@@ -1,13 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ExtractedData } from '../types';
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-    throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+// Se inicializará el cliente de IA de forma diferida (lazy) para evitar que la aplicación se bloquee al cargar
+// si la variable de entorno API_KEY no está presente.
 
 const fileToGenerativePart = async (file: File) => {
     const base64EncodedData = await new Promise<string>((resolve, reject) => {
@@ -29,6 +24,16 @@ const textToGenerativePart = (text: string) => {
 };
 
 export const extractExpenseInfo = async (file: File): Promise<ExtractedData | null> => {
+    const API_KEY = process.env.API_KEY;
+
+    if (!API_KEY) {
+        // Ahora esto registrará un error en la consola en lugar de bloquear la aplicación.
+        // La interfaz de usuario mostrará un error de extracción.
+        console.error("API_KEY environment variable not set. Please configure it in your Vercel project settings.");
+        return null;
+    }
+
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
     const model = 'gemini-2.5-flash';
 
     const basePrompt = `
